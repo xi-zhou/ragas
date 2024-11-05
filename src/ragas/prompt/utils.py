@@ -1,7 +1,11 @@
 import copy
 import typing as t
+from typing import List, Type, Tuple, Dict
 
+import dspy
+from dspy import Signature, make_signature, OutputField, InputField
 from pydantic import BaseModel
+from pydantic.fields import FieldInfo
 
 
 def get_all_strings(obj: t.Any) -> list[str]:
@@ -101,6 +105,53 @@ def extract_json(text: str) -> str:
 
         # When count returns to zero, we've found a complete structure
         if count == 0:
-            return text[start_idx : i + 1]
+            return text[start_idx: i + 1]
 
     return text  # In case of unbalanced JSON, return the original text
+
+
+# prepare training data for optimizer
+def create_dspy_example(user_input, response, refusal):
+    return dspy.Example(user_input=user_input, response=response, refusal=refusal).with_inputs("user_input", "response")
+
+
+def boolcheck(example, pred, trace=None):
+    return int(example.refusal == pred.refusal)
+
+def demos_to_examples(
+        data: List,
+        input_model: Type[BaseModel],
+        output_model: Type[BaseModel]
+) -> List[Tuple[BaseModel, BaseModel]]:
+    """
+    Convert a list of data items to a list of tuples containing input and output models.
+
+    Returns:
+        List[Tuple[BaseModel, BaseModel]]: A list of tuples where each tuple contains an input model and an output model.
+    """
+    examples = []
+    for item in data:
+        example_in = input_model.model_validate(item.toDict())
+        example_out = output_model.model_validate(item.toDict())
+        examples.append((example_in, example_out))
+    return examples
+
+
+def base_model_to_signature(
+        input: Type[BaseModel],
+        output: Type[BaseModel],
+        signature_name: str = "StringSignature",
+        instructions: str = None,
+) -> Type[Signature]:
+    """
+    Convert input and output BaseModel types of LLM metrics to a DSPy Signature.
+    """
+    signature_fields: Dict[str, Tuple[Type, FieldInfo]] = {}
+
+    for name, field in input.model_fields.items():
+        signature_fields[name] = (field.annotation, InputField(desc=field.description or ""))
+
+    for name, field in output.model_fields.items():
+        signature_fields[name] = (field.annotation, OutputField(desc=field.description or ""))
+
+    return make_signature(signature_fields, instructions=instructions, signature_name=signature_name)
