@@ -110,15 +110,14 @@ def extract_json(text: str) -> str:
     return text  # In case of unbalanced JSON, return the original text
 
 
-# prepare training data for optimizer
+
 def create_dspy_example(user_input, response, refusal):
     return dspy.Example(user_input=user_input, response=response, refusal=refusal).with_inputs("user_input", "response")
-
 
 def boolcheck(example, pred, trace=None):
     return int(example.refusal == pred.refusal)
 
-def demos_to_examples(
+def dspy_example_to_ragas(
         data: List,
         input_model: Type[BaseModel],
         output_model: Type[BaseModel]
@@ -155,3 +154,31 @@ def base_model_to_signature(
         signature_fields[name] = (field.annotation, OutputField(desc=field.description or ""))
 
     return make_signature(signature_fields, instructions=instructions, signature_name=signature_name)
+
+
+def ragas_example_to_dspy(
+        data: List[Tuple[BaseModel, BaseModel]],
+        input_model: Type[BaseModel],
+        output_model: Type[BaseModel]
+) -> List:
+    '''Prepare training data for DSPy from existing ragas example '''
+    examples = []
+    for input_instance, output_instance in data:
+        input_fields = input_model.model_validate(input_instance.model_dump()).model_dump()
+        output_fields = output_model.model_validate(output_instance.model_dump()).model_dump()
+
+        example = dspy.Example(
+            **input_fields,
+            **output_fields
+        ).with_inputs(*input_fields.keys())
+
+        examples.append(example)
+
+    return examples
+
+
+def judge(example, pred, trace=None):
+    classifier = ", ".join(key for key, value in example.labels().toDict().items() if isinstance(value, int))
+    example_verdict = example.labels().toDict().get(classifier)
+    pred_verdict = pred.get(classifier)
+    return int(example_verdict == pred_verdict)
