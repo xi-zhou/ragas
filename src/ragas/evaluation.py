@@ -237,6 +237,10 @@ def evaluate(
     tracer = RagasTracer()
     ragas_callbacks["tracer"] = tracer
 
+
+    langfuse= CallbackHandler()
+    ragas_callbacks["langfuse"] = langfuse
+
     # check if cost needs to be calculated
     if token_usage_parser is not None:
         from ragas.cost import CostCallbackHandler
