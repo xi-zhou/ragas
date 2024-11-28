@@ -16,7 +16,7 @@ from ragas.executor import is_event_loop_running
 from ragas.prompt import PromptMixin
 from ragas.run_config import RunConfig
 from ragas.utils import RAGAS_SUPPORTED_LANGUAGE_CODES, camel_to_snake, deprecated
-
+from langfuse.callback import CallbackHandler
 if t.TYPE_CHECKING:
     from langchain_core.callbacks import Callbacks
 
@@ -300,6 +300,8 @@ class SingleTurnMetric(Metric):
         May raise asyncio.TimeoutError if the scoring process exceeds the specified timeout.
         """
         callbacks = callbacks or []
+        langfuse_handler = CallbackHandler()
+        callbacks.append(langfuse_handler)
         # only get the required columns
         sample = self._only_required_columns_single_turn(sample)
         rm, group_cm = new_group(
