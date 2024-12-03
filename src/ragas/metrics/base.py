@@ -250,6 +250,7 @@ class SingleTurnMetric(Metric):
         self,
         sample: SingleTurnSample,
         callbacks: Callbacks = None,
+        handler: CallbackHandler = None,
     ) -> float:
         """
         Synchronously score a single-turn sample.
@@ -257,6 +258,9 @@ class SingleTurnMetric(Metric):
         May raise ImportError if nest_asyncio is not installed in a Jupyter-like environment.
         """
         callbacks = callbacks or []
+        #langfuse_handler = CallbackHandler()
+        callbacks.append(handler)
+        #callbacks["langfuse"] = handler
         # only get the required columns
         sample = self._only_required_columns_single_turn(sample)
         rm, group_cm = new_group(
@@ -292,6 +296,7 @@ class SingleTurnMetric(Metric):
         self,
         sample: SingleTurnSample,
         callbacks: Callbacks = None,
+        handler: CallbackHandler = None,
         timeout: t.Optional[float] = None,
     ) -> float:
         """
@@ -300,8 +305,9 @@ class SingleTurnMetric(Metric):
         May raise asyncio.TimeoutError if the scoring process exceeds the specified timeout.
         """
         callbacks = callbacks or []
-        langfuse_handler = CallbackHandler()
-        callbacks.append(langfuse_handler)
+        #langfuse_handler = CallbackHandler()
+        #callbacks["langfuse"] = handler
+        #callbacks.append(handler)
         # only get the required columns
         sample = self._only_required_columns_single_turn(sample)
         rm, group_cm = new_group(

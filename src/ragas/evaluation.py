@@ -43,7 +43,7 @@ from ragas.validation import (
     validate_required_columns,
     validate_supported_metrics,
 )
-
+from langfuse.callback import CallbackHandler
 if t.TYPE_CHECKING:
     from langchain_core.callbacks import Callbacks
 
@@ -237,9 +237,8 @@ def evaluate(
     tracer = RagasTracer()
     ragas_callbacks["tracer"] = tracer
 
-
-    langfuse= CallbackHandler()
-    ragas_callbacks["langfuse"] = langfuse
+    # langfuse= CallbackHandler()
+    # ragas_callbacks["langfuse"] = langfuse
 
     # check if cost needs to be calculated
     if token_usage_parser is not None:
