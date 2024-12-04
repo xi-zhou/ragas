@@ -58,7 +58,7 @@ class PersonaList(BaseModel):
                 return persona
         raise KeyError(f"No persona found with name '{key}'")
 
-
+from langfuse.callback import CallbackHandler
 def generate_personas_from_kg(
     kg: KnowledgeGraph,
     llm: BaseRagasLLM,
@@ -66,6 +66,7 @@ def generate_personas_from_kg(
     num_personas: int = 3,
     filter_fn: t.Callable[[Node], bool] = default_filter,
     callbacks: Callbacks = [],
+    handler: CallbackHandler = None,
 ) -> t.List[Persona]:
     """
     Generate personas from a knowledge graph based on cluster of similar document summaries.
@@ -131,7 +132,9 @@ def generate_personas_from_kg(
         top_summaries.extend(
             np.random.choice(top_summaries, num_personas - len(top_summaries))
         )
-
+    callbacks = callbacks or []
+    if handler:
+        callbacks.append(handler)
     # use run_async_batch to generate personas in parallel
     kwargs_list = [
         {

@@ -24,6 +24,7 @@ from ragas.testset.synthesizers import default_query_distribution
 from ragas.testset.synthesizers.testset_schema import Testset, TestsetSample
 from ragas.testset.synthesizers.utils import calculate_split_values
 from ragas.testset.transforms import Transforms, apply_transforms, default_transforms
+from langfuse.callback import CallbackHandler
 
 if t.TYPE_CHECKING:
     from langchain_core.callbacks import Callbacks
@@ -282,6 +283,7 @@ class TestsetGenerator:
         token_usage_parser: t.Optional[TokenUsageParser] = None,
         with_debugging_logs=False,
         raise_exceptions: bool = True,
+        handler: CallbackHandler = None,
     ) -> Testset:
         """
         Generate an evaluation dataset based on given scenarios and parameters.
@@ -331,6 +333,8 @@ class TestsetGenerator:
             self.llm, self.knowledge_graph
         )
         callbacks = callbacks or []
+        if handler:
+            callbacks.append(handler)
 
         # dict to store any callbacks we define
         ragas_callbacks = {}
