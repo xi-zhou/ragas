@@ -1,11 +1,40 @@
 import typing as t
 from dataclasses import dataclass
 
+import tiktoken
+from langfuse.decorators import observe, langfuse_context
+from langfuse.model import ModelUsage
 from pydantic import BaseModel
 
 from ragas.prompt import PydanticPrompt, StringIO
 from ragas.testset.graph import Node
 from ragas.testset.transforms.base import LLMBasedExtractor
+
+
+def get_input_prompt(
+        llm_judge_prompt: t.Type[BaseModel],
+        sample=None,
+) -> t.List:
+    prompt_input_model = llm_judge_prompt.input_model
+    prompt_example = llm_judge_prompt.examples[0]
+    single_turn = prompt_input_model.construct(**sample.model_dump())
+
+    input_instance, output_instance = prompt_example
+    input_fields = (prompt_input_model.model_validate(input_instance.model_dump()).model_dump())
+    # key of llm_judge_prompt and singleturnsample not always match
+    if len(single_turn.model_dump()) == len(input_fields):
+        prompt_str = llm_judge_prompt.to_string(data=single_turn)
+        return prompt_str
+    else:
+        sample_str = sample.model_dump_json()
+        prompt_str = llm_judge_prompt.to_string().replace("(None)", f"({sample_str})")
+        return prompt_str
+
+
+def count_openai_tokens(text, model="gpt-4o"):
+    tokenizer = tiktoken.encoding_for_model(model)
+    prompt_tokens = tokenizer.encode(text)
+    return len(prompt_tokens)
 
 
 class TextWithExtractionLimit(BaseModel):
@@ -172,12 +201,26 @@ class SummaryExtractor(LLMBasedExtractor):
     property_name: str = "summary"
     prompt: SummaryExtractorPrompt = SummaryExtractorPrompt()
 
+    @observe(name="extract summary", as_type="generation")
     async def extract(self, node: Node) -> t.Tuple[str, t.Any]:
         node_text = node.get_property("page_content")
         if node_text is None:
             return self.property_name, None
         chunks = self.split_text_by_token_limit(node_text, self.max_token_limit)
         result = await self.prompt.generate(self.llm, data=StringIO(text=chunks[0]))
+
+        prompt_str = get_input_prompt(self.prompt, sample=StringIO(text=chunks[0]))
+        usage_data = ModelUsage(
+            input=count_openai_tokens(prompt_str),
+            output=count_openai_tokens(str(result)),  # Assuming total_tokens includes both input and output tokens
+            unit="TOKENS",
+        )
+        langfuse_context.update_current_observation(
+            input=prompt_str,
+            output=result,
+            usage=usage_data,
+            model="gpt-4o",
+        )
         return self.property_name, result.text
 
 
@@ -205,11 +248,31 @@ class KeyphrasesExtractor(LLMBasedExtractor):
         chunks = self.split_text_by_token_limit(node_text, self.max_token_limit)
         keyphrases = []
         for chunk in chunks:
-            result = await self.prompt.generate(
-                self.llm, data=TextWithExtractionLimit(text=chunk, max_num=self.max_num)
-            )
+            result = await self.process_chunk(chunk)
             keyphrases.extend(result.keyphrases)
+
         return self.property_name, keyphrases
+
+    @observe(name="extract keyphrase", as_type="generation")
+    async def process_chunk(self, chunk):
+        result = await self.prompt.generate(
+            self.llm, data=TextWithExtractionLimit(text=chunk, max_num=self.max_num)
+        )
+
+        prompt_str = get_input_prompt(self.prompt, sample=TextWithExtractionLimit(text=chunk, max_num=self.max_num))
+
+        usage_data = ModelUsage(
+            input=count_openai_tokens(prompt_str),
+            output=count_openai_tokens(str(result)),  # Assuming total_tokens includes both input and output tokens
+            unit="TOKENS",
+        )
+        langfuse_context.update_current_observation(
+            input=prompt_str,
+            output=result,
+            usage=usage_data,
+            model="gpt-4o",
+        )
+        return result
 
 
 @dataclass
@@ -228,12 +291,28 @@ class TitleExtractor(LLMBasedExtractor):
     property_name: str = "title"
     prompt: TitleExtractorPrompt = TitleExtractorPrompt()
 
+    @observe(name="extract title", as_type="generation")
     async def extract(self, node: Node) -> t.Tuple[str, t.Any]:
         node_text = node.get_property("page_content")
         if node_text is None:
             return self.property_name, None
         chunks = self.split_text_by_token_limit(node_text, self.max_token_limit)
+
         result = await self.prompt.generate(self.llm, data=StringIO(text=chunks[0]))
+
+        prompt_str = get_input_prompt(self.prompt, sample=StringIO(text=chunks[0]))
+
+        usage_data = ModelUsage(
+            input=count_openai_tokens(prompt_str),
+            output=count_openai_tokens(str(result)),  # Assuming total_tokens includes both input and output tokens
+            unit="TOKENS",
+        )
+        langfuse_context.update_current_observation(
+            input=prompt_str,
+            output=result,
+            usage=usage_data,
+            model="gpt-4o",
+        )
         return self.property_name, result.text
 
 
@@ -260,13 +339,34 @@ class HeadlinesExtractor(LLMBasedExtractor):
             return self.property_name, None
         chunks = self.split_text_by_token_limit(node_text, self.max_token_limit)
         headlines = []
+
         for chunk in chunks:
-            result = await self.prompt.generate(
-                self.llm, data=TextWithExtractionLimit(text=chunk, max_num=self.max_num)
-            )
+            result = await self.process_chunk(chunk)
             if result:
                 headlines.extend(result.headlines)
         return self.property_name, headlines
+
+    @observe(name="extract headlines", as_type="generation")
+    async def process_chunk(self, chunk):
+        result = await self.prompt.generate(
+            self.llm, data=TextWithExtractionLimit(text=chunk, max_num=self.max_num)
+        )
+
+        prompt_str = get_input_prompt(self.prompt,
+                                      sample=TextWithExtractionLimit(text=chunk, max_num=self.max_num))
+
+        usage_data = ModelUsage(
+            input=count_openai_tokens(prompt_str),
+            output=count_openai_tokens(str(result)),  # Assuming total_tokens includes both input and output tokens
+            unit="TOKENS",
+        )
+        langfuse_context.update_current_observation(
+            input=prompt_str,
+            output=result,
+            usage=usage_data,
+            model="gpt-4o",
+        )
+        return result
 
 
 @dataclass
@@ -293,12 +393,33 @@ class NERExtractor(LLMBasedExtractor):
         chunks = self.split_text_by_token_limit(node_text, self.max_token_limit)
         entities = []
         for chunk in chunks:
-            result = await self.prompt.generate(
-                self.llm,
-                data=TextWithExtractionLimit(text=chunk, max_num=self.max_num_entities),
-            )
-            entities.extend(result.entities)
+            result = await self.process_chunk(chunk)
+            if result:
+                entities.extend(result.entities)
         return self.property_name, entities
+
+    @observe(name="extract NER", as_type="generation")
+    async def process_chunk(self, chunk):
+        result = await self.prompt.generate(
+            self.llm,
+            data=TextWithExtractionLimit(text=chunk, max_num=self.max_num_entities),
+        )
+
+        prompt_str = get_input_prompt(self.prompt,
+                                      sample=TextWithExtractionLimit(text=chunk, max_num=self.max_num_entities))
+
+        usage_data = ModelUsage(
+            input=count_openai_tokens(prompt_str),
+            output=count_openai_tokens(str(result)),  # Assuming total_tokens includes both input and output tokens
+            unit="TOKENS",
+        )
+        langfuse_context.update_current_observation(
+            input=prompt_str,
+            output=result,
+            usage=usage_data,
+            model="gpt-4o",
+        )
+        return result
 
 
 class TopicDescription(BaseModel):
@@ -339,12 +460,28 @@ class TopicDescriptionExtractor(LLMBasedExtractor):
     property_name: str = "topic_description"
     prompt: PydanticPrompt = TopicDescriptionPrompt()
 
+    @observe(name="extract topic description", as_type="generation")
     async def extract(self, node: Node) -> t.Tuple[str, t.Any]:
         node_text = node.get_property("page_content")
         if node_text is None:
             return self.property_name, None
         chunks = self.split_text_by_token_limit(node_text, self.max_token_limit)
         result = await self.prompt.generate(self.llm, data=StringIO(text=chunks[0]))
+
+        prompt_str = get_input_prompt(self.prompt,
+                                      sample=StringIO(text=chunks[0]))
+
+        usage_data = ModelUsage(
+            input=count_openai_tokens(prompt_str),
+            output=count_openai_tokens(str(result)),  # Assuming total_tokens includes both input and output tokens
+            unit="TOKENS",
+        )
+        langfuse_context.update_current_observation(
+            input=prompt_str,
+            output=result,
+            usage=usage_data,
+            model="gpt-4o",
+        )
         return self.property_name, result.description
 
 
@@ -402,10 +539,31 @@ class ThemesExtractor(LLMBasedExtractor):
         chunks = self.split_text_by_token_limit(node_text, self.max_token_limit)
         themes = []
         for chunk in chunks:
-            result = await self.prompt.generate(
-                self.llm,
-                data=TextWithExtractionLimit(text=chunk, max_num=self.max_num_themes),
-            )
-            themes.extend(result.output)
+            result = await self.process_chunk(chunk)
+            if result:
+                themes.extend(result.output)
 
         return self.property_name, themes
+
+    @observe(name="extract Themes", as_type="generation")
+    async def process_chunk(self, chunk):
+        result = await self.prompt.generate(
+            self.llm,
+            data=TextWithExtractionLimit(text=chunk, max_num=self.max_num_themes),
+        )
+
+        prompt_str = get_input_prompt(self.prompt,
+                                      sample=TextWithExtractionLimit(text=chunk, max_num=self.max_num_themes))
+
+        usage_data = ModelUsage(
+            input=count_openai_tokens(prompt_str),
+            output=count_openai_tokens(str(result)),  # Assuming total_tokens includes both input and output tokens
+            unit="TOKENS",
+        )
+        langfuse_context.update_current_observation(
+            input=prompt_str,
+            output=result,
+            usage=usage_data,
+            model="gpt-4o",
+        )
+        return result

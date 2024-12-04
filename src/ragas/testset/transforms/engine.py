@@ -4,8 +4,10 @@ import asyncio
 import logging
 import typing as t
 
+from langfuse.decorators import observe
 from tqdm.auto import tqdm
 
+from ragas.callbacks import new_group
 from ragas.executor import as_completed, is_event_loop_running
 from ragas.run_config import RunConfig
 from ragas.testset.graph import KnowledgeGraph
@@ -82,7 +84,7 @@ def apply_nest_asyncio():
             nest_asyncio.apply()
             NEST_ASYNCIO_APPLIED = True
 
-
+@observe(name="transform")
 def apply_transforms(
     kg: KnowledgeGraph,
     transforms: Transforms,
