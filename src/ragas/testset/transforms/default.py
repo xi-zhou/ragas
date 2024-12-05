@@ -49,7 +49,7 @@ def default_transforms(
         A list of transformation steps to be applied to the knowledge graph.
 
     """
-
+    # count number of tokens in each document's page_content
     def count_doc_length_bins(documents, bin_ranges):
         data = [num_tokens_from_string(doc.page_content) for doc in documents]
         bins = {f"{start}-{end}": 0 for start, end in bin_ranges}
@@ -74,13 +74,15 @@ def default_transforms(
     def filter_chunks(node):
         return node.type == NodeType.CHUNK
 
-    bin_ranges = [(0, 100), (101, 500), (501, 100000)]
+    bin_ranges = [(0, 100), (101, 500), (501, 100000)] #token of each page
     result = count_doc_length_bins(documents, bin_ranges)
     result = {k: v / len(documents) for k, v in result.items()}
+    print(result)
 
     transforms = []
-
+    #  if the proportion of documents with a token count between 501 and 100000 is at least 25%.
     if result["501-100000"] >= 0.25:
+        print("Processing large documents")
         headline_extractor = HeadlinesExtractor(
             llm=llm, filter_nodes=lambda node: filter_doc_with_num_tokens(node)
         )
@@ -126,6 +128,7 @@ def default_transforms(
             Parallel(cosine_sim_builder, ner_overlap_sim),
         ]
     elif result["101-500"] >= 0.25:
+        print("Processing small documents")
         summary_extractor = SummaryExtractor(
             llm=llm, filter_nodes=lambda node: filter_doc_with_num_tokens(node, 100)
         )
