@@ -51,8 +51,7 @@ from ragas.metrics._noise_sensitivity import NoiseSensitivity
 
 from ragas.metrics._rouge_score import RougeScore
 from ragas.metrics._simple_criteria import (
-    SimpleCriteriaScoreWithReference,
-    SimpleCriteriaScoreWithoutReference,
+    SimpleCriteriaScore
 )
 from ragas.metrics._sql_semantic_equivalence import LLMSQLEquivalence
 from ragas.metrics._string import (
