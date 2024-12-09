@@ -46,9 +46,14 @@ from ragas.metrics._multi_modal_relevance import (
     MultiModalRelevance,
     multimodal_relevance,
 )
+from ragas.metrics._negative_rejection import RefusalRate
 from ragas.metrics._noise_sensitivity import NoiseSensitivity
+
 from ragas.metrics._rouge_score import RougeScore
-from ragas.metrics._simple_criteria import SimpleCriteriaScore
+from ragas.metrics._simple_criteria import (
+    SimpleCriteriaScoreWithReference,
+    SimpleCriteriaScoreWithoutReference,
+)
 from ragas.metrics._sql_semantic_equivalence import LLMSQLEquivalence
 from ragas.metrics._string import (
     DistanceMeasure,
@@ -126,4 +131,7 @@ __all__ = [
     "multimodal_faithness",
     "MultiModalRelevance",
     "multimodal_relevance",
+    "SimpleCriteriaScoreWithReference",
+    "SimpleCriteriaScoreWithoutReference",
+    "RefusalRate",
 ]
