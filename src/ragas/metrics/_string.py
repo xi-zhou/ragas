@@ -29,7 +29,7 @@ class ExactMatch(SingleTurnMetric):
     async def _single_turn_ascore(
         self, sample: SingleTurnSample, callbacks: Callbacks
     ) -> float:
-        return float(sample.reference == sample.response)
+        return float(sample.reference.lower() == sample.response.lower())
 
     async def _ascore(self, row: t.Dict, callbacks: Callbacks) -> float:
         return await self._single_turn_ascore(SingleTurnSample(**row), callbacks)

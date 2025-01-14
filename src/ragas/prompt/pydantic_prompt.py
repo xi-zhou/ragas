@@ -438,7 +438,7 @@ class TranslateStatements(PydanticPrompt[ToTranslate, Translated]):
     examples = [
         (
             ToTranslate(
-                target_language="hindi",
+                target_language="deutsch",
                 statements=[
                     "Albert Einstein was born in Germany.",
                     "Albert Einstein was best known for his theory of relativity.",
@@ -446,26 +446,11 @@ class TranslateStatements(PydanticPrompt[ToTranslate, Translated]):
             ),
             Translated(
                 statements=[
-                    "अल्बर्ट आइंस्टीन का जन्म जर्मनी में हुआ था।",
-                    "अल्बर्ट आइंस्टीन अपने सापेक्षता के सिद्धांत के लिए सबसे अधिक प्रसिद्ध थे।",
+                    "Albert Einstein wurde in Deutschland geboren.",
+                    "Albert Einstein wurde vor allem durch seine Relativitätstheorie bekannt.",
                 ]
             ),
-        ),
-        (
-            ToTranslate(
-                target_language="dutch",
-                statements=[
-                    "Paris is the capital of France.",
-                    "Croissants are a popular French pastry.",
-                ],
-            ),
-            Translated(
-                statements=[
-                    "Parijs is de hoofdstad van Frankrijk.",
-                    "Croissants zijn een populair Frans gebak.",
-                ]
-            ),
-        ),
+        )
     ]
 
     def process_output(self, output: Translated, input: ToTranslate) -> Translated:

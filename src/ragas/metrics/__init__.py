@@ -133,4 +133,5 @@ __all__ = [
     "SimpleCriteriaScoreWithReference",
     "SimpleCriteriaScoreWithoutReference",
     "RefusalRate",
+    "SimpleCriteriaScoreWithReference"
 ]
